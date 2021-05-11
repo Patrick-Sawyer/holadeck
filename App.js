@@ -1,27 +1,31 @@
-import React from 'react';
-import {SafeAreaView, ScrollView, StatusBar, StyleSheet} from 'react-native';
+import React, {useEffect, useState} from 'react';
+import {
+  Dimensions,
+  View,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Platform,
+} from 'react-native';
 import {NativeRouter, Route} from 'react-router-native';
 
 import Home from './src/pages/Home';
 import Colors from './src/Colors';
 
 const App = () => {
-  // const [isLoaded] = useFonts({
-  //   BringThaNoize: require('./assets/fonts/bring-tha-noize/bringthanoize.ttf'),
-  //   Neuropol: require('./assets/fonts/neuropol/neuropol.ttf'),
-  //   Projects: require('./assets/fonts/projects/projects.ttf'),
-  //   Verela: require('./assets/fonts/varela-round/VarelaRound-Regular.ttf'),
-  //   Zekton: require('./assets/fonts/zekton-free/zektonrg.ttf'),
-  //   Zorque: require('./assets/fonts/zorque/zorque.ttf'),
-  // });
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle={'light-content'} backgroundColor={Colors.darkGrey} />
+      <StatusBar
+        // hidden={isFullScreen}
+        barStyle={'light-content'}
+        backgroundColor={Colors.lab7}
+      />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         style={styles.scroll}>
         <NativeRouter>
-          <Route exact path="/" component={Home} />
+          <Route exact path="/" component={props => <Home {...props} />} />
         </NativeRouter>
       </ScrollView>
     </SafeAreaView>
@@ -30,7 +34,7 @@ const App = () => {
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: Colors.darkGrey,
+    backgroundColor: Colors.lab7,
     flexGrow: 1,
   },
   scroll: {

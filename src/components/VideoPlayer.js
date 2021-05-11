@@ -10,7 +10,6 @@ import {
 import Video from 'react-native-video';
 
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-
 import Colors from '../Colors';
 
 const VideoPlayer = ({videoUrl}) => {
@@ -22,9 +21,11 @@ const VideoPlayer = ({videoUrl}) => {
   const [timelineWidth, setTimelineWidth] = useState(400);
   const [muted, setMuted] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [fullscreen, setFullScreen] = useState(false);
   const [videoHeight, setVideoHeight] = useState(
     (Dimensions.get('screen').width * 9) / 16,
   );
+  const [touchInProgress, setTouchInProgress] = useState(false);
 
   const playOrPauseIcon = () => {
     let icon = paused ? 'play-circle-outline' : 'pause-circle-outline';
@@ -53,7 +54,7 @@ const VideoPlayer = ({videoUrl}) => {
 
   const controls = () => {
     return (
-      <View style={styles.controls}>
+      <View style={[styles.controls]}>
         {skipBackButton()}
         {playOrPauseIcon()}
         <Text style={[styles.positionText, duration >= 3600 && styles.wider]}>
@@ -64,6 +65,7 @@ const VideoPlayer = ({videoUrl}) => {
           {timeToText(duration)}
         </Text>
         {muteButton()}
+        {fullScreenButton()}
       </View>
     );
   };
@@ -77,13 +79,27 @@ const VideoPlayer = ({videoUrl}) => {
   };
 
   const onProgress = test => {
-    setLoading(false);
-    const {seekableDuration, playableDuration, currentTime} = test;
-    setPosition(currentTime);
-    setBufferPostion(playableDuration);
-    if (seekableDuration !== duration) {
-      setDuration(seekableDuration);
+    if (!touchInProgress) {
+      setLoading(false);
+      const {seekableDuration, playableDuration, currentTime} = test;
+      setPosition(currentTime);
+      setBufferPostion(playableDuration);
+      if (seekableDuration !== duration) {
+        setDuration(seekableDuration);
+      }
     }
+  };
+
+  const fullScreenButton = () => {
+    let icon = fullscreen ? 'fullscreen-exit' : 'fullscreen';
+    return (
+      <TouchableWithoutFeedback
+        onPress={() => {
+          setFullScreen(!fullscreen);
+        }}>
+        <Icon name={icon} size={40} color={Colors.lab7} />
+      </TouchableWithoutFeedback>
+    );
   };
 
   const muteButton = () => {
@@ -98,51 +114,75 @@ const VideoPlayer = ({videoUrl}) => {
     );
   };
 
+  const handleTouch = (evt, bool) => {
+    if (bool) {
+      setTouchInProgress(true);
+    } else {
+      setTimeout(() => {
+        setTouchInProgress(false);
+      }, 500);
+    }
+    const {locationX, pageX} = evt.nativeEvent;
+    const newPosition =
+      locationX < pageX ? (locationX * duration) / timelineWidth : position;
+    if (!bool) {
+      setBufferPostion(newPosition);
+      setPosition(newPosition);
+      playerRef.current.seek(newPosition, 1000);
+      setBufferPostion(newPosition);
+    }
+    if (locationX < pageX) {
+      setPosition(newPosition);
+    }
+  };
+
   const timeline = () => {
     return (
-      <TouchableWithoutFeedback
-        onPress={evt => {
-          const clickPosition = evt.nativeEvent.locationX;
-          const newPosition = (clickPosition * duration) / timelineWidth;
-          if (duration > 1) {
-            setBufferPostion(newPosition);
-            setPosition(newPosition);
-            playerRef.current.seek(newPosition, 1000);
-            setBufferPostion(newPosition);
-            setPosition(newPosition);
-          }
-        }}>
-        <View
-          onLayout={evt => {
-            const width = evt.nativeEvent.layout.width;
-            setTimelineWidth(width);
-          }}
-          style={styles.grow}>
-          <View style={styles.timelineContainer}>
-            <View style={styles.timelineInnerContainer}>
-              <View style={[styles.timeline, styles.timelineBase]} />
-              <View
-                style={[
-                  styles.timeline,
-                  {
-                    width: (bufferPostion * 100) / duration + '%',
-                    backgroundColor: Colors.lab5,
-                  },
-                ]}
-              />
-              <View
-                style={[
-                  styles.timeline,
-                  {
-                    width: (position * 100) / duration + '%',
-                    backgroundColor: Colors.lab3,
-                  },
-                ]}
-              />
-            </View>
+      <View
+        onLayout={evt => {
+          const width = evt.nativeEvent.layout.width;
+          setTimelineWidth(width);
+        }}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        accessibilityRole={'adjustable'}
+        onResponderGrant={evt => {
+          handleTouch(evt, true);
+        }}
+        onResponderReject={() => {
+          console.log('rejected');
+        }}
+        onResponderMove={evt => {
+          handleTouch(evt, true);
+        }}
+        onResponderRelease={evt => {
+          handleTouch(evt, false);
+        }}
+        style={styles.grow}>
+        <View style={styles.timelineContainer}>
+          <View style={styles.timelineInnerContainer}>
+            <View style={[styles.timeline, styles.timelineBase]} />
+            <View
+              style={[
+                styles.timeline,
+                {
+                  width: (bufferPostion * 100) / duration + '%',
+                  backgroundColor: Colors.lab5,
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.timeline,
+                {
+                  width: (position * 100) / duration + '%',
+                  backgroundColor: Colors.lab3,
+                },
+              ]}
+            />
           </View>
         </View>
-      </TouchableWithoutFeedback>
+      </View>
     );
   };
 
@@ -152,6 +192,10 @@ const VideoPlayer = ({videoUrl}) => {
     }
   };
 
+  const handleClickOnVideo = () => {
+    setPaused(!paused);
+  };
+
   return (
     <View
       style={styles.videoPlayerContainer}
@@ -159,32 +203,32 @@ const VideoPlayer = ({videoUrl}) => {
         const width = evt.nativeEvent.layout.width;
         setVideoHeight((width * 9) / 16);
       }}>
-      <View style={styles.videoPlayerContainer}>
-        <Video
-          source={{uri: videoUrl}}
-          ref={playerRef}
-          style={[styles.video, {height: videoHeight}]}
-          resizeMode="contain"
-          paused={paused}
-          onProgress={onProgress}
-          muted={muted}
-          progressUpdateInterval={1000}
-          onEnd={() => {
-            setPosition(duration);
-            setPaused(true);
-          }}
-          onLoad={() => {
-            setLoading(false);
-          }}
-          onPlaybackRateChange={() => {
-            setLoading(false);
-          }}
-          onSeek={() => {
-            setLoading(false);
-          }}
-        />
-        <View style={styles.loadingIcon}>{loadingIcon()}</View>
-      </View>
+      <TouchableWithoutFeedback onPress={handleClickOnVideo}>
+        <View style={styles.videoPlayerContainer}>
+          <Video
+            source={{uri: videoUrl}}
+            ref={playerRef}
+            style={[styles.video, {height: videoHeight}]}
+            resizeMode="contain"
+            paused={paused}
+            onProgress={onProgress}
+            muted={muted}
+            progressUpdateInterval={40}
+            onPlaybackRateChange={() => {
+              console.log('sdgsdgsd');
+            }}
+            onEnd={() => {
+              setPosition(duration);
+              setPaused(true);
+            }}
+            onLoad={() => {
+              setLoading(false);
+            }}
+          />
+          <View style={styles.loadingIcon}>{loadingIcon()}</View>
+        </View>
+      </TouchableWithoutFeedback>
+
       {controls()}
     </View>
   );
@@ -203,9 +247,7 @@ const styles = StyleSheet.create({
     display: 'flex',
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderColor: Colors.lab2,
-    marginBottom: 10,
+    backgroundColor: Colors.white,
   },
   positionText: {
     marginHorizontal: 5,
