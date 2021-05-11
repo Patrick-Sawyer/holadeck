@@ -80,7 +80,6 @@ const VideoPlayer = ({videoUrl}) => {
 
   const onProgress = test => {
     if (!touchInProgress) {
-      setLoading(false);
       const {seekableDuration, playableDuration, currentTime} = test;
       setPosition(currentTime);
       setBufferPostion(playableDuration);
@@ -149,9 +148,6 @@ const VideoPlayer = ({videoUrl}) => {
         onResponderGrant={evt => {
           handleTouch(evt, true);
         }}
-        onResponderReject={() => {
-          console.log('rejected');
-        }}
         onResponderMove={evt => {
           handleTouch(evt, true);
         }}
@@ -214,9 +210,6 @@ const VideoPlayer = ({videoUrl}) => {
             onProgress={onProgress}
             muted={muted}
             progressUpdateInterval={40}
-            onPlaybackRateChange={() => {
-              console.log('sdgsdgsd');
-            }}
             onEnd={() => {
               setPosition(duration);
               setPaused(true);
