@@ -1,4 +1,4 @@
-import React, {useState, useRef} from 'react';
+import React, {useState, useRef, useEffect} from 'react';
 import {
   Dimensions,
   StyleSheet,
@@ -6,6 +6,9 @@ import {
   Text,
   TouchableWithoutFeedback,
   ActivityIndicator,
+  Modal,
+  Animated,
+  SafeAreaView,
 } from 'react-native';
 import Video from 'react-native-video';
 
@@ -13,7 +16,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Colors from '../Colors';
 
 const VideoPlayer = ({videoUrl}) => {
-  const [paused, setPaused] = useState(false);
+  const [paused, setPaused] = useState(true);
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
   const [bufferPostion, setBufferPostion] = useState(0);
@@ -22,10 +25,9 @@ const VideoPlayer = ({videoUrl}) => {
   const [muted, setMuted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [fullscreen, setFullScreen] = useState(false);
-  const [videoHeight, setVideoHeight] = useState(
-    (Dimensions.get('screen').width * 9) / 16,
-  );
+  const [modalVisible, setModalVisible] = useState(false);
   const [touchInProgress, setTouchInProgress] = useState(false);
+  const controlsOffset = useRef(new Animated.Value(0)).current;
 
   const playOrPauseIcon = () => {
     let icon = paused ? 'play-circle-outline' : 'pause-circle-outline';
@@ -52,9 +54,24 @@ const VideoPlayer = ({videoUrl}) => {
     );
   };
 
+  const animateControlsOffset = (toValue, time) => {
+    Animated.timing(controlsOffset, {
+      toValue: toValue,
+      duration: time,
+      useNativeDriver: true,
+    }).start();
+  };
+
   const controls = () => {
     return (
-      <View style={[styles.controls]}>
+      <Animated.View
+        style={[
+          styles.controls,
+          fullscreen && styles.absolute,
+          fullscreen && {
+            transform: [{translateY: controlsOffset}],
+          },
+        ]}>
         {skipBackButton()}
         {playOrPauseIcon()}
         <Text style={[styles.positionText, duration >= 3600 && styles.wider]}>
@@ -66,7 +83,7 @@ const VideoPlayer = ({videoUrl}) => {
         </Text>
         {muteButton()}
         {fullScreenButton()}
-      </View>
+      </Animated.View>
     );
   };
 
@@ -78,14 +95,11 @@ const VideoPlayer = ({videoUrl}) => {
       .substr(substringStart, substringLength);
   };
 
-  const onProgress = test => {
+  const onProgress = data => {
     if (!touchInProgress) {
-      const {seekableDuration, playableDuration, currentTime} = test;
+      const {playableDuration, currentTime} = data;
       setPosition(currentTime);
       setBufferPostion(playableDuration);
-      if (seekableDuration !== duration) {
-        setDuration(seekableDuration);
-      }
     }
   };
 
@@ -94,7 +108,9 @@ const VideoPlayer = ({videoUrl}) => {
     return (
       <TouchableWithoutFeedback
         onPress={() => {
+          hideControlsInAFewSeconds(true);
           setFullScreen(!fullscreen);
+          setModalVisible(!fullscreen);
         }}>
         <Icon name={icon} size={40} color={Colors.lab7} />
       </TouchableWithoutFeedback>
@@ -191,42 +207,95 @@ const VideoPlayer = ({videoUrl}) => {
 
   const handleClickOnVideo = () => {
     setPaused(!paused);
+    hideControlsInAFewSeconds();
   };
 
-  return (
-    <View
-      style={styles.videoPlayerContainer}
-      onLayout={evt => {
-        const width = evt.nativeEvent.layout.width;
-        setVideoHeight((width * 9) / 16);
-      }}>
+  const hideControlsInAFewSeconds = bool => {
+    animateControlsOffset(0, 0);
+    if (fullscreen || bool) {
+      setTimeout(() => {
+        if (fullscreen) {
+          animateControlsOffset(60, 3000);
+        }
+      }, 5000);
+    }
+  };
+
+  const videoObject = (
+    <View style={styles.fullSize}>
       <TouchableWithoutFeedback onPress={handleClickOnVideo}>
         <View style={styles.videoPlayerContainer}>
           <Video
             source={{uri: videoUrl}}
             ref={playerRef}
-            style={[styles.video, {height: videoHeight}]}
+            style={[
+              styles.video,
+              {
+                height:
+                  (Math.min(
+                    Dimensions.get('screen').width,
+                    Dimensions.get('screen').height,
+                  ) *
+                    9) /
+                  16,
+              },
+              fullscreen && styles.fullSize,
+            ]}
             resizeMode="contain"
             paused={paused}
             onProgress={onProgress}
             onSeek={() => {
-              setLoading(false)
+              setLoading(false);
+              hideControlsInAFewSeconds();
             }}
+            useTextureView={false}
             muted={muted}
             progressUpdateInterval={40}
             onEnd={() => {
               setPosition(duration);
               setPaused(true);
+              animateControlsOffset(0, 0);
             }}
-            onLoad={() => {
+            bufferConfig={{
+              minBufferMs: paused ? 1000 : 1000,
+              maxBufferMs: paused ? 5000 : 50000,
+              bufferForPlaybackMs: 1000,
+              bufferForPlaybackAfterRebufferMs: 1000,
+            }}
+            onLoad={data => {
+              setDuration(data.duration);
+              if (position !== 0) {
+                playerRef.current.seek(position, 1000);
+              }
               setLoading(false);
+              hideControlsInAFewSeconds();
             }}
           />
           <View style={styles.loadingIcon}>{loadingIcon()}</View>
         </View>
       </TouchableWithoutFeedback>
-
       {controls()}
+    </View>
+  );
+
+  return (
+    <View style={styles.videoPlayerContainer}>
+      <Modal
+        transparent={true}
+        visible={modalVisible}
+        animationType={'fade'}
+        statusBarTranslucent={true}
+        supportedOrientations={['portrait', 'landscape']}
+        onRequestClose={() => {
+          setModalVisible(!modalVisible);
+          setFullScreen(false);
+        }}>
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.modalInner}>{videoObject}</View>
+        </SafeAreaView>
+      </Modal>
+
+      {!fullscreen && videoObject}
     </View>
   );
 };
@@ -292,6 +361,17 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
   },
+  modalInner: {
+    height: '100%',
+    width: '100%',
+    backgroundColor: 'black',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  fullSize: {width: '100%', height: '100%'},
+  absolute: {position: 'absolute', bottom: 0},
+  safeArea: {flex: 1, backgroundColor: 'black'},
 });
 
 export default VideoPlayer;

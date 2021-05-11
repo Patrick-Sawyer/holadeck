@@ -1,13 +1,5 @@
-import React, {useEffect, useState} from 'react';
-import {
-  Dimensions,
-  View,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Platform,
-} from 'react-native';
+import React from 'react';
+import {SafeAreaView, ScrollView, StatusBar, StyleSheet} from 'react-native';
 import {NativeRouter, Route} from 'react-router-native';
 
 import Home from './src/pages/Home';
@@ -17,8 +9,9 @@ const App = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar
-        // hidden={isFullScreen}
         barStyle={'light-content'}
+        showHideTransition={'none'}
+        translucent={false}
         backgroundColor={Colors.lab7}
       />
       <ScrollView
