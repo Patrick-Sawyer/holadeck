@@ -153,6 +153,7 @@ const VideoPlayer = ({videoUrl}) => {
         }}
         onResponderRelease={evt => {
           handleTouch(evt, false);
+          setLoading(true);
         }}
         style={styles.grow}>
         <View style={styles.timelineContainer}>
@@ -208,6 +209,9 @@ const VideoPlayer = ({videoUrl}) => {
             resizeMode="contain"
             paused={paused}
             onProgress={onProgress}
+            onSeek={() => {
+              setLoading(false)
+            }}
             muted={muted}
             progressUpdateInterval={40}
             onEnd={() => {
